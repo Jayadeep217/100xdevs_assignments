@@ -1,0 +1,16 @@
+{
+  "name": "inmem-todo-app",
+  "version": "1.0.0",
+  "description": "in memory to-do app",
+  "license": "ISC",
+  "author": "Jayadeep",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "nanoid": "^5.1.5"
+  }
+}
