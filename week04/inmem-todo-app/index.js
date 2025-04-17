@@ -12,25 +12,22 @@ app.get("/", function (req, res) {
     1. Add task (POST /add-task?title=TaskTitle&desc=TaskDescription)
     2. Update task (POST /update-task?id=TaskID&title=NewTaskTitle&desc=NewTaskDescription)
     3. Delete task (DELETE /delete-task?id=TaskID)
-    4. Search task (GET /search?id=TaskID)
+    4. Search task (GET /search-task?id=TaskID)
     5. List all tasks (GET /list)
     `);
 });
 
-app.get("/search", function (req, res) {
+app.get("/search-task", function (req, res) {
   if (req.query.id) {
     const task_id = req.query.id;
-    let search_idx = -1;
-    tasks.forEach((task, index) => {
-      if (task.task_id === task_id) {
-        search_idx = index;
-      } else {
-        res.send("Task not found ❌");
-      }
-    });
-    res.send(tasks[search_idx]);
+    const search_idx = tasks.findIndex((task) => task.task_id === task_id);
+    if (search_idx !== -1) {
+      res.status(200).json({ message: `${tasks[search_idx]}` });
+    } else {
+      res.status(404).json({ error: "Task not found ❌" });
+    }
   } else {
-    res.send("Task id not provided ❌");
+    res.status(400).json({ error: "Task id not provided ❌" });
   }
 });
 
@@ -45,7 +42,7 @@ app.post("/add-task", function (req, res) {
       task_desc: task_desc,
     };
     tasks.push(task);
-    res.status(200).json({ message: `Task added ✅. Task ID is "${task_id}"` });
+    res.status(200).json({ message: `Task added ✅. Task ID is ${task_id}` });
   } else {
     res.status(400).json({ error: "Task Not added ❌. Task is not provided!" });
   }
@@ -56,33 +53,33 @@ app.post("/update-task", function (req, res) {
     const task_id = req.query.id;
     const task_title = req.query.title;
     const task_desc = req.query.desc;
-    tasks.forEach((task) => {
-      if (task.task_id === task_id) {
-        task.task_title = task_title;
-        task.task_desc = task_desc;
-      } else {
-        res.send("Task not found ❌");
+    const update_idx = tasks.findIndex((task) => task.task_id === task_id);
+    if (update_idx !== -1) {
+      if (task_title !== undefined) {
+        tasks[update_idx].task_title = task_title;
       }
-    });
-    res.send("Task updated ✅ ");
+      if (task_desc !== undefined) {
+        tasks[update_idx].task_desc = task_desc;
+      }
+      res
+        .status(200)
+        .json({ message: "Task updated ✅ ", data: `${tasks[update_idx]}` });
+    } else {
+      res.status(404).json({ error: "Task not found ❌" });
+    }
   } else {
-    res.send("Task id not provided ❌ ");
+    res.status(400).json({ error: "Task id not provided ❌ " });
   }
 });
 
 app.delete("/delete-task", function (req, res) {
   if (req.query.id) {
     const task_id = req.query.id;
-    let delete_idx = -1;
-    tasks.forEach((task, index) => {
-      if (task.task_id === task_id) {
-        delete_idx = index;
-      }
-    });
+    const delete_idx = tasks.findIndex((task) => task.task_id === task_id);
     tasks.splice(delete_idx, 1);
-    res.send("Task delete ❌ ");
+    res.status(200).json({ message: "Task delete successfully ✅ " });
   } else {
-    res.send("Task id not provided ❌ ");
+    res.status(400).json({ error: "Task id not provided ❌ " });
   }
 });
 
