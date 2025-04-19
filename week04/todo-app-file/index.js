@@ -1,10 +1,14 @@
 const express = require("express");
-const nanoid = require("nanoid");
+const { customAlphabet } = require("nanoid");
+const fs = require("fs").promises;
+const path = require("path");
+
 const app = express();
-
 const PORT = 3000;
+const TASKS_FILE = path.join(__dirname, "todo.json");
+let tasks = [];
 
-const tasks = [];
+app.use(express.json());
 
 app.get("/", function (req, res) {
   res.send(`
@@ -18,82 +22,91 @@ app.get("/", function (req, res) {
 });
 
 app.get("/search-task", function (req, res) {
-  if (req.query.id) {
-    const task_id = req.query.id;
-    const search_idx = tasks.findIndex((task) => task.task_id === task_id);
-    if (search_idx !== -1) {
-      res.status(200).json({ message: `${tasks[search_idx]}` });
-    } else {
-      res.status(404).json({ error: "Task not found ❌" });
-    }
+  const { id } = req.query;
+  if (!id) return res.status(400).json({ error: "Task id not provided" });
+
+  const task = tasks.find((task) => task.task_id === id);
+  if (task) {
+    res.status(200).json({ task });
   } else {
-    res.status(400).json({ error: "Task id not provided ❌" });
+    res.status(404).json({ error: "Task not found" });
   }
 });
 
-app.post("/add-task", function (req, res) {
-  if (req.query.title) {
-    const task_id = autoGenerateTaskId();
-    const task_title = req.query.title;
-    const task_desc = req.query.desc;
-    const task = {
-      task_id: task_id,
-      task_title: task_title,
-      task_desc: task_desc,
-    };
-    tasks.push(task);
-    res.status(200).json({ message: `Task added ✅. Task ID is ${task_id}` });
-  } else {
-    res.status(400).json({ error: "Task Not added ❌. Task is not provided!" });
-  }
+app.post("/add-task", async (req, res) => {
+  const { title, desc } = req.query;
+  if (!title)
+    return res
+      .status(400)
+      .json({ error: "Task Not added. Task is not provided!" });
+
+  const task = {
+    task_id: generateTaskId(),
+    task_title: title,
+    task_desc: desc || "",
+  };
+
+  tasks.push(task);
+  await saveTasksToFile();
+  res.status(200).json({ message: `Task added. Task ID is ${task.task_id}` });
 });
 
-app.post("/update-task", function (req, res) {
-  if (req.query.id) {
-    const task_id = req.query.id;
-    const task_title = req.query.title;
-    const task_desc = req.query.desc;
-    const update_idx = tasks.findIndex((task) => task.task_id === task_id);
-    if (update_idx !== -1) {
-      if (task_title !== undefined) {
-        tasks[update_idx].task_title = task_title;
-      }
-      if (task_desc !== undefined) {
-        tasks[update_idx].task_desc = task_desc;
-      }
-      res
-        .status(200)
-        .json({ message: "Task updated ✅ ", data: `${tasks[update_idx]}` });
-    } else {
-      res.status(404).json({ error: "Task not found ❌" });
-    }
-  } else {
-    res.status(400).json({ error: "Task id not provided ❌ " });
-  }
+app.post("/update-task", async (req, res) => {
+  const { id, title, desc } = req.query;
+  if (!id) return res.status(400).json({ error: "Task id not provided" });
+
+  const index = tasks.findIndex((task) => task.task_id === id);
+  if (index === -1) return res.status(404).json({ error: "Task not found" });
+
+  if (title !== undefined) tasks[index].task_title = title;
+  if (desc !== undefined) tasks[index].task_desc = desc;
+  await saveTasksToFile();
+
+  res.status(200).json({ message: "Task updated", task: tasks[index] });
 });
 
-app.delete("/delete-task", function (req, res) {
-  if (req.query.id) {
-    const task_id = req.query.id;
-    const delete_idx = tasks.findIndex((task) => task.task_id === task_id);
-    tasks.splice(delete_idx, 1);
-    res.status(200).json({ message: "Task delete successfully ✅ " });
-  } else {
-    res.status(400).json({ error: "Task id not provided ❌ " });
-  }
+app.delete("/delete-task", async (req, res) => {
+  const { id } = req.query;
+  if (!id) return res.status(400).json({ error: "Task id not provided" });
+
+  const index = tasks.findIndex((task) => task.task_id === id);
+  if (index === -1) return res.status(404).json({ error: "Task not found" });
+
+  tasks.splice(index, 1);
+  await saveTasksToFile();
+  res.status(200).json({ message: "Task deleted successfully" });
 });
 
 app.get("/list", function (req, res) {
-  res.send(tasks);
+  res.status(200).json(tasks);
 });
 
-app.listen(PORT, function () {
+app.listen(PORT, async function () {
+  tasks = await loadTasksFromFile();
   console.log(`App listening on port ${PORT}`);
 });
 
-function autoGenerateTaskId() {
-  return nanoid.customAlphabet(
+function generateTaskId() {
+  return customAlphabet(
     "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
     8
   )();
+}
+
+async function loadTasksFromFile() {
+  try {
+    const data = await fs.readFile(TASKS_FILE, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    console.log("No existing todo.json found or invalid JSON. Starting fresh.");
+    return [];
+  }
+}
+
+async function saveTasksToFile() {
+  try {
+    await fs.writeFile(TASKS_FILE, JSON.stringify(tasks, null, 2), "utf-8");
+  } catch (error) {
+    console.error("Failed to save tasks to file:", error);
+  }
 }
