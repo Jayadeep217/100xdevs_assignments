@@ -5,10 +5,26 @@ const path = require("path");
 
 const app = express();
 const PORT = 3000;
-const TASKS_FILE = path.join(__dirname, "todo.json");
+const DATA_DIR = path.join(__dirname, "data");
+const TASKS_FILE = path.join(DATA_DIR, "todo.json");
 let tasks = [];
 
 app.use(express.json());
+
+// Initialize storage directory and file
+async function initStorage() {
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    try {
+      await fs.access(TASKS_FILE);
+    } catch {
+      await fs.writeFile(TASKS_FILE, "[]"); // Create with empty array if doesn't exist
+    }
+  } catch (error) {
+    console.error("Failed to initialize storage:", error);
+    process.exit(1); // Exit if storage can't be initialized
+  }
+}
 
 app.get("/", function (req, res) {
   res.send(`
@@ -81,10 +97,26 @@ app.get("/list", function (req, res) {
   res.status(200).json(tasks);
 });
 
-app.listen(PORT, async function () {
-  tasks = await loadTasksFromFile();
-  console.log(`App listening on port ${PORT}`);
-});
+async function loadTasksFromFile() {
+  try {
+    const data = await fs.readFile(TASKS_FILE, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    console.log("No valid task data found, starting with empty list");
+    return [];
+  }
+}
+
+async function saveTasksToFile() {
+  try {
+    const tempFile = `${TASKS_FILE}.tmp`;
+    await fs.writeFile(tempFile, JSON.stringify(tasks, null, 2));
+    await fs.rename(tempFile, TASKS_FILE); // Atomic replace
+  } catch (error) {
+    console.error("Failed to save tasks:", error);
+    throw error; // Propagate error to route handlers
+  }
+}
 
 function generateTaskId() {
   return customAlphabet(
@@ -93,20 +125,18 @@ function generateTaskId() {
   )();
 }
 
-async function loadTasksFromFile() {
+// Start the server
+async function startServer() {
   try {
-    const data = await fs.readFile(TASKS_FILE, "utf-8");
-    return JSON.parse(data);
+    await initStorage();
+    tasks = await loadTasksFromFile();
+    app.listen(PORT, () => {
+      console.log(`App listening on port ${PORT}`);
+    });
   } catch (error) {
-    console.log("No existing todo.json found or invalid JSON. Starting fresh.");
-    return [];
+    console.error("Failed to start server:", error);
+    process.exit(1);
   }
 }
 
-async function saveTasksToFile() {
-  try {
-    await fs.writeFile(TASKS_FILE, JSON.stringify(tasks, null, 2), "utf-8");
-  } catch (error) {
-    console.error("Failed to save tasks to file:", error);
-  }
-}
+startServer();
