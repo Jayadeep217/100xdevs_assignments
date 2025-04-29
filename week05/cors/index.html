@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CORS Testing</title>
+  </head>
+  <body>
+    <input type="text" id="a" placeholder="First Number" />
+    <input type="text" id="b" placeholder="Second Number" />
+
+    <input type="button" value="Sum" onclick="findSum()" />
+    <input type="button" value="Connection-Test" onclick="connectionTest()" />
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+      function connectionTest() {
+        axios
+          .get("http://localhost:3120/")
+          .then(function (response) {
+            alert(response.data.message);
+          })
+          .catch(function (error) {
+            console.log(error);
+          });
+      }
+      function findSum() {
+        const a = parseInt(document.getElementById("a").value);
+        const b = parseInt(document.getElementById("b").value);
+
+        axios
+          .post("http://localhost:3120/sum", { a, b })
+          .then(function (response) {
+            alert(response.data.ans);
+          })
+          .catch(function (error) {
+            console.log(error);
+          });
+      }
+    </script>
+  </body>
+</html>
