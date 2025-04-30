@@ -1,36 +1,53 @@
 const express = require("express");
+const { customAlphabet } = require("nanoid");
 
 const app = express();
 const PORT = 32121;
+const TOKEN_SIZE = 14;
 const users = [
   {
-    username: "3245ewtesdf",
-    password: "dfg43twerta",
+    username: "user",
+    password: "pass",
   },
   {
-    username: "4536dfgh456",
-    password: "fgedrfg346gdsrf36",
+    username: "user1",
+    password: "pass@123",
   },
   {
-    username: "gjhy8jyt8jyt65",
-    password: "dfhterbtbwerb3645q",
+    username: "guser65",
+    password: "password65",
   },
 ];
 
 app.use(express.json());
 
+function generateRandomToken() {
+  return customAlphabet(
+    "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+    TOKEN_SIZE
+  )();
+}
+
 function signupHandler(req, res) {
-  const { username, password } = req.query;
+  const { username, password } = req.body;
   users.push({ username, password });
   res.status(200).json({ mesage: "user signup successful" });
 }
 
 function signinHandler(req, res) {
-  const { username } = req.query;
-  const authUser = users.filter((user) => {
-    return user.username === username;
-  });
-  res.status(200).json({ message: `${authUser} is authenticated` });
+  const { username, password } = req.body;
+  const authUser = users.find(
+    (user) => user.username === username && user.password === password
+  )[0];
+  if (authUser) {
+    authUser.token = generateRandomToken();
+    res.status(200).json({
+      message: authUser.username + " is authenticated",
+      authToken: authUser.token,
+    });
+  } else {
+    res.status(401).json({ message: "Invalid credentials" });
+  }
 }
 
 function displayAllUsers(req, res) {
