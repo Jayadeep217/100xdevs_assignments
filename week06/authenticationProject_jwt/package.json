@@ -1,0 +1,16 @@
+{
+  "name": "authenticationproject",
+  "version": "1.0.0",
+  "description": "authentication test",
+  "license": "ISC",
+  "author": "Jayadeep Gaddam",
+  "type": "commonjs",
+  "scripts": {
+    "start": " node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

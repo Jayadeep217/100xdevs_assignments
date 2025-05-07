@@ -1,9 +1,10 @@
 const express = require("express");
-const { customAlphabet } = require("nanoid");
+const jwt = require("jsonwebtoken");
 
 const app = express();
+
+const JWT_SECRET = "sdfsdfdfdsfdsf";
 const PORT = 32121;
-const TOKEN_SIZE = 14;
 const users = [
   { username: "user", password: "pass" },
   { username: "user1", password: "pass@123" },
@@ -11,13 +12,6 @@ const users = [
 ];
 
 app.use(express.json());
-
-function generateRandomToken() {
-  return customAlphabet(
-    "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-    TOKEN_SIZE
-  )();
-}
 
 function signupHandler(req, res) {
   const { username, password } = req.body;
@@ -31,10 +25,10 @@ function signinHandler(req, res) {
     (user) => user.username === username && user.password === password
   );
   if (authUser) {
-    authUser.authToken = generateRandomToken();
+    const authToken = jwt.sign({ username: username }, JWT_SECRET);
     res.status(200).json({
       message: authUser.username + " is authenticated",
-      authToken: authUser.authToken,
+      authToken: authToken,
     });
   } else {
     res.status(401).json({ message: "Invalid credentials" });
@@ -47,9 +41,10 @@ function displayAllUsers(req, res) {
 
 function aboutMe(req, res) {
   const authToken = req.headers["authtoken"];
+  const verifyToken = jwt.verify(authToken, JWT_SECRET);
 
-  const authUser = users.find((user) => user.authToken === authToken);
-
+  const auth_username =  verifyToken.username;
+  const authUser = users.find((user) => user.username === auth_username);
   if (authUser) {
     res.status(200).json({
       username: authUser.username,
