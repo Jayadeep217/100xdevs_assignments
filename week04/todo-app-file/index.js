@@ -111,10 +111,10 @@ async function saveTasksToFile() {
   try {
     const tempFile = `${TASKS_FILE}.tmp`;
     await fs.writeFile(tempFile, JSON.stringify(tasks, null, 2));
-    await fs.rename(tempFile, TASKS_FILE); // Atomic replace
+    await fs.rename(tempFile, TASKS_FILE);
   } catch (error) {
     console.error("Failed to save tasks:", error);
-    throw error; // Propagate error to route handlers
+    throw error;
   }
 }
 
