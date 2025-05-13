@@ -1,0 +1,18 @@
+{
+  "name": "assignment_todo-app-fileauth",
+  "version": "1.0.0",
+  "description": "todo app with jwt auth & file based",
+  "license": "ISC",
+  "author": "Jayadeep Gaddam",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "nanoid": "^5.1.5"
+
+  }
+}
