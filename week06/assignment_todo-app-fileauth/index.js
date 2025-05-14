@@ -3,6 +3,7 @@ const fs = require("fs").promises;
 const jwt = require("jsonwebtoken");
 const { nanoid } = require("nanoid");
 const path = require("path");
+const logger = require('./logger');
 
 const app = express();
 const PORT = 54676;
