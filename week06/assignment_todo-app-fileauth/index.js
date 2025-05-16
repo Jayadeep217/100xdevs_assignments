@@ -3,10 +3,10 @@ const fs = require("fs").promises;
 const jwt = require("jsonwebtoken");
 const { nanoid } = require("nanoid");
 const path = require("path");
-const logger = require('./logger');
+const { initLogger, getISTTimestamp } = require("./logger");
 
 const app = express();
-const PORT = 54676;
+const PORT = 4676;
 const JWT_SECRET = "SECRET_RSDZJt_6578";
 const USERID_SIZE = 12;
 
@@ -14,48 +14,33 @@ const DATA_DIR = path.join(__dirname, "data");
 const TODOS_FILE = path.join(DATA_DIR, "todos.json");
 
 const data = {};
+let logger;
 
 app.use(express.json());
 
 //* functions
-function getCurrentDateTime() {
-  const now = new Date();
-
-  const day = String(now.getDate()).padStart(2, "0");
-  const month = String(now.getMonth() + 1).padStart(2, "0"); //Month is 0-indexed
-  const year = now.getFullYear();
-  const hours = String(now.getHours()).padStart(2, "0");
-  const minutes = String(now.getMinutes()).padStart(2, "0");
-  const seconds = String(now.getSeconds()).padStart(2, "0");
-
-  return `${year}/${month}/${day}T${hours}:${minutes}:${seconds}`;
-}
-
 async function initStorage() {
-  console.info(getCurrentDateTime() + " - Storage Initialization...");
+  logger.info("Storage Initialization...");
   try {
-    console.info(getCurrentDateTime() + " - Data dir creation in progress...");
+    logger.info("Data dir creation in progress...");
     await fs.mkdir(DATA_DIR, { recursive: true });
+
     try {
-      console.info(getCurrentDateTime() + " - Checking access to data...");
+      logger.info("Checking access to data...");
       await fs.access(TODOS_FILE);
-      console.info(
-        getCurrentDateTime() + " - Data file accessible. Loading Data..."
-      );
+      logger.info("Data file accessible. Loading Data...");
     } catch {
-      console.warn(
-        getCurrentDateTime() + " - Data file not found! Starting afresh!"
-      );
-      await fs.writeFile(TODOS_FILE, JSON.stringify(data)); // Create with empty object if doesn't exist
+      logger.warn("Data file not found! Starting afresh!");
+      await fs.writeFile(TODOS_FILE, JSON.stringify(data));
     }
   } catch (error) {
-    console.error("Failed to initialize storage", error);
-    process.exit(1); // Exit if storage can't be initialized
+    logger.error("Failed to initialize storage", error);
+    process.exit(1);
   }
 }
 
 function requestInfoLogger(req, res, next) {
-  console.log(getCurrentDateTime(), req.method, req.url);
+  logger.info(`${req.method} ${req.url}`);
   next();
 }
 
@@ -75,26 +60,51 @@ function loginUser(req, res) {
   const authUID = Object.keys(data).filter(
     (key) => data[key].username === username && data[key].password === password
   );
-  if (authUID) {
-    const authToken = jwt.verify({ username: username }, JWT_SECRET);
+  if (authUID.length > 0) {
+    const authToken = jwt.sign({ username: username }, JWT_SECRET, {
+      expiresIn: "1h",
+    });
     res.status(200).json({
       message: "Login successful!",
       authToken: authToken,
     });
+  } else {
+    res.status(401).json({ message: "Invalid credentials" });
   }
 }
 
-function authenticateToken(req, res, next) {}
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
 
-function getUserProfile(req, res) {}
+  if (!token) return res.sendStatus(401);
 
-function getTodoList(req, res) {}
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
+}
 
-function addTodoItem(req, res) {}
+function getUserProfile(req, res) {
+  res.json({ message: "User profile route - not yet implemented" });
+}
 
-function updateTodoItem(req, res) {}
+function getTodoList(req, res) {
+  res.json({ message: "Get todos - not yet implemented" });
+}
 
-function deleteTodoItem(req, res) {}
+function addTodoItem(req, res) {
+  res.json({ message: "Add todo - not yet implemented" });
+}
+
+function updateTodoItem(req, res) {
+  res.json({ message: "Update todo - not yet implemented" });
+}
+
+function deleteTodoItem(req, res) {
+  res.json({ message: "Delete todo - not yet implemented" });
+}
 
 //* Routes
 app.post("/auth/signup", requestInfoLogger, registerUser);
@@ -110,14 +120,18 @@ app.delete(
   deleteTodoItem
 );
 
+//* Boot Sequence
 async function startServer() {
   try {
+    logger = await initLogger();
+    logger.info("Logger initialized");
+
     await initStorage();
     app.listen(PORT, () => {
-      console.log(getCurrentDateTime() + ` - App listening on port ${PORT}`);
+      logger.info(`App listening on port ${PORT}`);
     });
   } catch (error) {
-    console.error(getCurrentDateTime() + " - Failed to start server:", error);
+    console.error(getISTTimestamp() + " - Fatal startup error:", error);
     process.exit(1);
   }
 }

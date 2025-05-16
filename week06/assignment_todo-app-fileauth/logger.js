@@ -15,15 +15,40 @@ function getISTTimestamp() {
   return dayjs().tz("Asia/Kolkata").format("YYYY-MM-DDTHH:mm:ss.SSSZ");
 }
 
-(async () => {
+const logFormat = format.printf(({ timestamp, level, message }) => {
+  return `${timestamp} - ${level.toUpperCase()} - ${message}`;
+});
+
+async function initLogger() {
   try {
-    console.info(getISTTimestamp() + " - Log directory initialisation ....");
     await fs.mkdir(LOGS_DIR, { recursive: true });
-  } catch (error) {
-    console.error(
-      getISTTimestamp() + " - Failed to create log directory:",
-      error
-    );
+  } catch (err) {
+    console.error(getISTTimestamp() + " - Failed to create log dir", err);
     process.exit(1);
   }
-})();
+
+  return createLogger({
+    level: "info",
+    transports: [
+      new transports.Console({
+        format: format.combine(
+          format.timestamp({ format: getISTTimestamp }),
+          logFormat
+        ),
+      }),
+      new transports.File({
+        filename: LOGS_FILE,
+        level: "info",
+        maxsize: 50 * 1024 * 1024,
+        maxFiles: 20,
+        tailable: true,
+        format: format.combine(
+          format.timestamp({ format: getISTTimestamp }),
+          logFormat
+        ),
+      }),
+    ],
+  });
+}
+
+module.exports = { initLogger, getISTTimestamp };
