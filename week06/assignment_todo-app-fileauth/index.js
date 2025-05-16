@@ -40,7 +40,7 @@ async function initStorage() {
 }
 
 function requestInfoLogger(req, res, next) {
-  logger.info(`${req.method} ${req.url}`);
+  logger.info(`${req.method} - ${req.url}`);
   next();
 }
 
@@ -49,18 +49,38 @@ function generateRandomUserID() {
 }
 
 function registerUser(req, res) {
-  const { username, password } = req.body;
-  const userID = generateRandomUserID().toString();
-  data[userID] = { username, password };
-  res.status(200).json({ message: "user signup successful" });
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res
+        .status(400)
+        .json({ message: "Username and password both are required" });
+    }
+
+    const usernameExists = Object.entries(data).some(
+      ([, value]) => value.username === username
+    );
+    if (usernameExists) {
+      return res.status(400).json({ message: "Username already exists." });
+    }
+
+    const userID = generateRandomUserID();
+    data[userID] = { username, password, todos: [] };
+    console.log(data);    
+    return res.status(200).json({ message: "user signup successful" });
+  } catch (error) {
+    return res.status(400).json({ message: "signup failed" + error });
+  }
 }
 
 function loginUser(req, res) {
   const { username, password } = req.body;
-  const authUID = Object.keys(data).filter(
-    (key) => data[key].username === username && data[key].password === password
+  const authUID = Object.entries(data).find(
+    ([, value]) => value.username === username && value.password === password
   );
-  if (authUID.length > 0) {
+
+  if (authUID) {
     const authToken = jwt.sign({ username: username }, JWT_SECRET, {
       expiresIn: "1h",
     });
@@ -127,11 +147,15 @@ async function startServer() {
     logger.info("Logger initialized");
 
     await initStorage();
-    app.listen(PORT, () => {
-      logger.info(`App listening on port ${PORT}`);
+    app.listen(PORT, function (error) {
+      if (error) {
+        logger.error("Server startup failed!", error);
+      } else {
+        logger.info(`App listening on port ${PORT}`);
+      }
     });
   } catch (error) {
-    console.error(getISTTimestamp() + " - Fatal startup error:", error);
+    logger.error("Fatal startup error:", error);
     process.exit(1);
   }
 }
