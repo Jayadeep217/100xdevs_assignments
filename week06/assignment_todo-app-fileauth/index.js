@@ -3,11 +3,11 @@ const fs = require("fs").promises;
 const jwt = require("jsonwebtoken");
 const { nanoid } = require("nanoid");
 const path = require("path");
-const { initLogger, getISTTimestamp } = require("./logger");
+const initLogger = require("./logger");
 
 const app = express();
 const PORT = 4676;
-const JWT_SECRET = "SECRET_RSDZJt_6578";
+const JWT_SECRET = "Sa2d@-#RSDZJt_657as8";
 const USERID_SIZE = 12;
 
 const DATA_DIR = path.join(__dirname, "data");
@@ -29,6 +29,10 @@ async function initStorage() {
       logger.info("Checking access to data...");
       await fs.access(TODOS_FILE);
       logger.info("Data file accessible. Loading Data...");
+
+      const fileContent = await fs.readFile(TODOS_FILE, "utf-8");
+      const parsedData = JSON.parse(fileContent);
+      Object.assign(data, parsedData);
     } catch {
       logger.warn("Data file not found! Starting afresh!");
       await fs.writeFile(TODOS_FILE, JSON.stringify(data));
@@ -67,47 +71,72 @@ function registerUser(req, res) {
 
     const userID = generateRandomUserID();
     data[userID] = { username, password, todos: [] };
-    console.log(data);    
+    console.log(data);
     return res.status(200).json({ message: "user signup successful" });
   } catch (error) {
-    return res.status(400).json({ message: "signup failed" + error });
+    logger.error("signup failed: " + error);
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 }
 
 function loginUser(req, res) {
-  const { username, password } = req.body;
-  const authUID = Object.entries(data).find(
-    ([, value]) => value.username === username && value.password === password
-  );
+  try {
+    const { username, password } = req.body;
 
-  if (authUID) {
-    const authToken = jwt.sign({ username: username }, JWT_SECRET, {
-      expiresIn: "1h",
-    });
+    if (!username || !password) {
+      return res
+        .status(400)
+        .json({ message: "Username and password both are required" });
+    }
+
+    const userEntry = Object.entries(data).find(
+      ([, value]) => value.username === username && value.password === password
+    );
+
+    if (!userEntry) {
+      res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const authToken = jwt.sign(
+      { username: username, userid: userEntry },
+      JWT_SECRET,
+      {
+        expiresIn: "1h",
+      }
+    );
+
     res.status(200).json({
       message: "Login successful!",
       authToken: authToken,
     });
-  } else {
-    res.status(401).json({ message: "Invalid credentials" });
+  } catch (error) {
+    logger.error("Login failed: " + error);
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 }
 
 function authenticateToken(req, res, next) {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
+  try {
+    const authHeader = req.headers["authorization"];
 
-  if (!token) return res.sendStatus(401);
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res
+        .status(401)
+        .json({ error: "Missing or malformed Authorization header" });
+    }
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
+    const token = authHeader.split(" ")[1];
+
+    const user = jwt.verify(token, JWT_SECRET);
     req.user = user;
     next();
-  });
+  } catch (error) {
+    return res.status(403).json({ error: "Invalid or expired token" });
+  }
 }
 
 function getUserProfile(req, res) {
-  res.json({ message: "User profile route - not yet implemented" });
+  res.json({ message: "User authenticated" });
 }
 
 function getTodoList(req, res) {

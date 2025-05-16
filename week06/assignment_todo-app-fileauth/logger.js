@@ -51,4 +51,4 @@ async function initLogger() {
   });
 }
 
-module.exports = { initLogger, getISTTimestamp };
+module.exports = initLogger;
