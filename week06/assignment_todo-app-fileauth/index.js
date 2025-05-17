@@ -19,7 +19,6 @@ let logger;
 
 app.use(express.json());
 
-//* functions
 async function initStorage() {
   logger.info("Storage Initialization...");
   try {
@@ -83,10 +82,10 @@ async function registerUser(req, res) {
     const userID = generateRandomID(USERID_SIZE);
     data[userID] = { username, password, todos: [] };
     await fs.writeFile(TODOS_FILE, JSON.stringify(data, null, 2));
-    return res.status(200).json({ message: "user signup successful" });
+    res.status(200).json({ message: "user signup successful" });
   } catch (error) {
     logger.error("signup failed: " + error);
-    return res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ message: "Internal Server Error" });
   }
 }
 
@@ -122,10 +121,11 @@ function loginUser(req, res) {
     });
   } catch (error) {
     logger.error("Login failed: " + error);
-    return res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ message: "Internal Server Error" });
   }
 }
 
+//middleware
 function authenticateToken(req, res, next) {
   try {
     const authHeader = req.headers["authorization"];
@@ -140,7 +140,7 @@ function authenticateToken(req, res, next) {
     next();
   } catch (error) {
     logger.error("Authentication failure:" + error);
-    return res.status(403).json({ error: error });
+    res.status(403).json({ error: error });
   }
 }
 
@@ -149,52 +149,100 @@ function getUserProfile(req, res) {
 }
 
 function getTodoList(req, res) {
-  let todos = data[req.userId]["todos"];
-  res.status(200).json(todos);
+  try {
+    let todos = data[req.userId]["todos"];
+    res.status(200).json(todos);
+  } catch (error) {
+    logger.error("getTodoList failure:" + error);
+    res.status(500).json({ message: "Internal Server error" });
+  }
 }
 
 async function addTodoItem(req, res) {
   try {
     const userId = req.userId;
     const { title, desc } = req.body;
-    if (!title)
-      return res
-        .status(400)
-        .json({ error: "Task Not added. Task is not provided!" });
+    if (!title) return res.status(400).json({ error: "Task is not provided!" });
 
     const newTodoId = generateRandomID(TODOID_SIZE);
     data[userId]["todos"][newTodoId] = {
       title: title,
       desc: desc || "",
     };
-    
+
     await saveToFile();
-    res.status(200).json({ message: "New task added successfully" });
+    res
+      .status(200)
+      .json({ message: "New task added successfully", todoId: newTodoId });
   } catch (error) {
     logger.error("addTodoItem Failure:", error);
-    return res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ message: "Internal Server Error" });
   }
 }
 
-function updateTodoItem(req, res) {}
+async function updateTodoItem(req, res) {
+  try {
+    const userId = req.userId;
+    const { todoId } = req.body;
 
-function deleteTodoItem(req, res) {}
+    if (!todoId) return res.status(400).json({ error: "TodoId is required!" });
 
-//* Routes
+    const userTodos = data[userId]?.todos;
+
+    if (!userTodos || !userTodos[todoId])
+      return res.status(404).json({ error: "Todo not found for this user" });
+
+    // Define allowed updatable fields
+    const allowedUpdates = ["title", "desc", "status"];
+    const updates = {};
+
+    for (const field of allowedUpdates) {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    }
+
+    // If nothing to update
+    if (Object.keys(updates).length === 0) {
+      return res
+        .status(400)
+        .json({ error: "No valid fields provided for update" });
+    }
+
+    // Apply updates
+    Object.assign(userTodos[todoId], updates);
+
+    await saveToFile();
+    res.status(200).json({ message: "Todo Updated successfully" });
+  } catch (error) {
+    logger.error("updateTodoItem Failure:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+function deleteTodoItem(req, res) {
+  try {
+    const userId = req.userId;
+    const { todoId } = req.body;
+  } catch (error) {
+    logger.error("deleteTodoItem Failure:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
 app.post("/auth/signup", requestInfoLogger, registerUser);
 app.post("/auth/signin", requestInfoLogger, loginUser);
 app.get("/users/me", requestInfoLogger, authenticateToken, getUserProfile);
 app.get("/todos/list", requestInfoLogger, authenticateToken, getTodoList);
 app.post("/todos/new", requestInfoLogger, authenticateToken, addTodoItem);
-app.put("/todos/:todoId", requestInfoLogger, authenticateToken, updateTodoItem);
+app.put("/todos/update", requestInfoLogger, authenticateToken, updateTodoItem);
 app.delete(
-  "/todos/:todoId",
+  "/todos/delete",
   requestInfoLogger,
   authenticateToken,
   deleteTodoItem
 );
 
-//* Boot Sequence
 async function startServer() {
   try {
     logger = await initLogger();
