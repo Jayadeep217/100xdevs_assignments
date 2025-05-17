@@ -9,6 +9,7 @@ const app = express();
 const PORT = 4676;
 const JWT_SECRET = "Sa2d@-#RSDZJt_657as8";
 const USERID_SIZE = 12;
+const TODOID_SIZE = 8;
 
 const DATA_DIR = path.join(__dirname, "data");
 const TODOS_FILE = path.join(DATA_DIR, "todos.json");
@@ -48,11 +49,21 @@ function requestInfoLogger(req, res, next) {
   next();
 }
 
-function generateRandomUserID() {
-  return nanoid(USERID_SIZE);
+function generateRandomID(size) {
+  return nanoid(size);
 }
 
-function registerUser(req, res) {
+async function saveToFile() {
+  try {
+    const temp_file = `${TODOS_FILE}.tmp`;
+    await fs.writeFile(temp_file, JSON.stringify(data, null, 2));
+    await fs.rename(temp_file, TODOS_FILE);
+  } catch (error) {
+    logger.error("Failed to save tasks:", error);
+  }
+}
+
+async function registerUser(req, res) {
   try {
     const { username, password } = req.body;
 
@@ -69,9 +80,9 @@ function registerUser(req, res) {
       return res.status(400).json({ message: "Username already exists." });
     }
 
-    const userID = generateRandomUserID();
+    const userID = generateRandomID(USERID_SIZE);
     data[userID] = { username, password, todos: [] };
-    console.log(data);
+    await fs.writeFile(TODOS_FILE, JSON.stringify(data, null, 2));
     return res.status(200).json({ message: "user signup successful" });
   } catch (error) {
     logger.error("signup failed: " + error);
@@ -94,11 +105,11 @@ function loginUser(req, res) {
     );
 
     if (!userEntry) {
-      res.status(401).json({ message: "Invalid credentials" });
+      return res.status(401).json({ message: "Invalid credentials" });
     }
-
+    const [userId, userData] = userEntry;
     const authToken = jwt.sign(
-      { username: username, userid: userEntry },
+      { userId, username: userData.username },
       JWT_SECRET,
       {
         expiresIn: "1h",
@@ -123,40 +134,58 @@ function authenticateToken(req, res, next) {
       return res.status(401).json({ error: "Missing Authorization header" });
     }
 
-    const user = jwt.verify(authHeader, JWT_SECRET);
-    req.user = user;
+    const token = jwt.verify(authHeader, JWT_SECRET);
+    req.userId = token.userId;
+    req.username = token.username;
     next();
   } catch (error) {
+    logger.error("Authentication failure:" + error);
     return res.status(403).json({ error: error });
   }
 }
 
 function getUserProfile(req, res) {
-  res.json({ message: "User authenticated" });
+  res.status(200).json({ userId: req.userId, username: req.username });
 }
 
 function getTodoList(req, res) {
-  res.json({ message: "Get todos - not yet implemented" });
+  let todos = data[req.userId]["todos"];
+  res.status(200).json(todos);
 }
 
-function addTodoItem(req, res) {
-  res.json({ message: "Add todo - not yet implemented" });
+async function addTodoItem(req, res) {
+  try {
+    const userId = req.userId;
+    const { title, desc } = req.body;
+    if (!title)
+      return res
+        .status(400)
+        .json({ error: "Task Not added. Task is not provided!" });
+
+    const newTodoId = generateRandomID(TODOID_SIZE);
+    data[userId]["todos"][newTodoId] = {
+      title: title,
+      desc: desc || "",
+    };
+    
+    await saveToFile();
+    res.status(200).json({ message: "New task added successfully" });
+  } catch (error) {
+    logger.error("addTodoItem Failure:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
 }
 
-function updateTodoItem(req, res) {
-  res.json({ message: "Update todo - not yet implemented" });
-}
+function updateTodoItem(req, res) {}
 
-function deleteTodoItem(req, res) {
-  res.json({ message: "Delete todo - not yet implemented" });
-}
+function deleteTodoItem(req, res) {}
 
 //* Routes
 app.post("/auth/signup", requestInfoLogger, registerUser);
 app.post("/auth/signin", requestInfoLogger, loginUser);
 app.get("/users/me", requestInfoLogger, authenticateToken, getUserProfile);
-app.get("/todos", requestInfoLogger, authenticateToken, getTodoList);
-app.post("/todos", requestInfoLogger, authenticateToken, addTodoItem);
+app.get("/todos/list", requestInfoLogger, authenticateToken, getTodoList);
+app.post("/todos/new", requestInfoLogger, authenticateToken, addTodoItem);
 app.put("/todos/:todoId", requestInfoLogger, authenticateToken, updateTodoItem);
 app.delete(
   "/todos/:todoId",
