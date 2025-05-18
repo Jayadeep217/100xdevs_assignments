@@ -10,6 +10,7 @@ const PORT = 4676;
 const JWT_SECRET = "Sa2d@-#RSDZJt_657as8";
 const USERID_SIZE = 12;
 const TODOID_SIZE = 8;
+const ALLOWED_STATUSES = ["todo", "in-progress", "done"];
 
 const DATA_DIR = path.join(__dirname, "data");
 const TODOS_FILE = path.join(DATA_DIR, "todos.json");
@@ -161,13 +162,18 @@ function getTodoList(req, res) {
 async function addTodoItem(req, res) {
   try {
     const userId = req.userId;
-    const { title, desc } = req.body;
+    const { title, desc, status } = req.body;
+
     if (!title) return res.status(400).json({ error: "Task is not provided!" });
 
     const newTodoId = generateRandomID(TODOID_SIZE);
     data[userId]["todos"][newTodoId] = {
       title: title,
       desc: desc || "",
+      status:
+        status !== undefined && ALLOWED_STATUSES.includes(status)
+          ? status
+          : "todo",
     };
 
     await saveToFile();
@@ -192,24 +198,22 @@ async function updateTodoItem(req, res) {
     if (!userTodos || !userTodos[todoId])
       return res.status(404).json({ error: "Todo not found for this user" });
 
-    // Define allowed updatable fields
-    const allowedUpdates = ["title", "desc", "status"];
     const updates = {};
 
-    for (const field of allowedUpdates) {
-      if (req.body[field] !== undefined) {
-        updates[field] = req.body[field];
-      }
-    }
-
-    // If nothing to update
+    if (req.body.title !== undefined) updates.title = req.body.title;
+    if (req.body.desc !== undefined) updates.desc = req.body.desc;
+    if (
+      updates.status !== undefined &&
+      !ALLOWED_STATUSES.includes(updates.status)
+    )
+      updates.status = req.body.status;
+      
     if (Object.keys(updates).length === 0) {
       return res
         .status(400)
         .json({ error: "No valid fields provided for update" });
     }
 
-    // Apply updates
     Object.assign(userTodos[todoId], updates);
 
     await saveToFile();
@@ -220,10 +224,22 @@ async function updateTodoItem(req, res) {
   }
 }
 
-function deleteTodoItem(req, res) {
+async function deleteTodoItem(req, res) {
   try {
     const userId = req.userId;
     const { todoId } = req.body;
+
+    if (!todoId) return res.status(400).json({ error: "TodoId is required!" });
+
+    const userTodos = data[userId]?.todos;
+
+    if (!userTodos || !userTodos[todoId])
+      return res.status(404).json({ error: "Todo not found for this user" });
+
+    delete userTodos[todoId];
+
+    await saveToFile();
+    res.status(200).json({ message: "Todo deleted successfully" });
   } catch (error) {
     logger.error("deleteTodoItem Failure:", error);
     res.status(500).json({ message: "Internal Server Error" });
