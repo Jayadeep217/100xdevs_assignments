@@ -49,6 +49,11 @@ function requestInfoLogger(req, res, next) {
   next();
 }
 
+function internalServerError(res, funcName, error) {
+  logger.error(`${funcName} failed: ` + error);
+  res.status(500).json({ error: "Internal Server Error" });
+}
+
 function generateRandomID(size) {
   return nanoid(size);
 }
@@ -81,12 +86,11 @@ async function registerUser(req, res) {
     }
 
     const userID = generateRandomID(USERID_SIZE);
-    data[userID] = { username, password, todos: [] };
+    data[userID] = { username, password, todos: {}};
     await fs.writeFile(TODOS_FILE, JSON.stringify(data, null, 2));
     res.status(200).json({ message: "user signup successful" });
   } catch (error) {
-    logger.error("signup failed: " + error);
-    res.status(500).json({ message: "Internal Server Error" });
+    internalServerError(res, "registerUser", error);
   }
 }
 
@@ -121,8 +125,7 @@ function loginUser(req, res) {
       authToken: authToken,
     });
   } catch (error) {
-    logger.error("Login failed: " + error);
-    res.status(500).json({ message: "Internal Server Error" });
+    internalServerError(res, "loginUser", error);
   }
 }
 
@@ -154,8 +157,40 @@ function getTodoList(req, res) {
     let todos = data[req.userId]["todos"];
     res.status(200).json(todos);
   } catch (error) {
-    logger.error("getTodoList failure:" + error);
-    res.status(500).json({ message: "Internal Server error" });
+    internalServerError(res, "getUserProfile", error);
+  }
+}
+
+function searchTodos(req, res) {
+  try {
+    const userId = req.userId;
+    const { todoId, title } = req.body;
+
+    if (!todoId && !title)
+      return res.status(400).json({ error: "Todo ID or title is required!" });
+
+    const userTodos = data[userId]?.todos;
+
+    if (!userTodos)
+      return res.status(404).json({ error: "Todo not found for this user" });
+
+    let todo;
+    if (todoId) {
+      todo = userTodos[todoId];
+      if (!todo) {
+        return res.status(404).json({ error: "Todo not found for this user" });
+      }
+    } else if (title) {
+      todo = Object.values(userTodos).find((item) => item.title === title);
+      if (!todo) {
+        return res
+          .status(404)
+          .json({ error: "Todo with that title not found" });
+      }
+    }
+    res.status(200).json(todo);
+  } catch (error) {
+    internalServerError(res, "searchTodos", error);
   }
 }
 
@@ -164,7 +199,8 @@ async function addTodoItem(req, res) {
     const userId = req.userId;
     const { title, desc, status } = req.body;
 
-    if (!title) return res.status(400).json({ error: "Task is not provided!" });
+    if (!title)
+      return res.status(400).json({ error: "Todo title is not provided!" });
 
     const newTodoId = generateRandomID(TODOID_SIZE);
     data[userId]["todos"][newTodoId] = {
@@ -181,8 +217,7 @@ async function addTodoItem(req, res) {
       .status(200)
       .json({ message: "New task added successfully", todoId: newTodoId });
   } catch (error) {
-    logger.error("addTodoItem Failure:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    internalServerError(res, "addTodoItem", error);
   }
 }
 
@@ -202,12 +237,12 @@ async function updateTodoItem(req, res) {
 
     if (req.body.title !== undefined) updates.title = req.body.title;
     if (req.body.desc !== undefined) updates.desc = req.body.desc;
-    if (
-      updates.status !== undefined &&
-      !ALLOWED_STATUSES.includes(updates.status)
-    )
+    if (updates.status !== undefined) {
+      if (!ALLOWED_STATUSES.includes(updates.status)) {
+        return res.status(400).json({ error: "Invalid status provided!" });
+      }
       updates.status = req.body.status;
-      
+    }
     if (Object.keys(updates).length === 0) {
       return res
         .status(400)
@@ -219,8 +254,7 @@ async function updateTodoItem(req, res) {
     await saveToFile();
     res.status(200).json({ message: "Todo Updated successfully" });
   } catch (error) {
-    logger.error("updateTodoItem Failure:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    internalServerError(res, "updateTodoItem", error);
   }
 }
 
@@ -241,14 +275,14 @@ async function deleteTodoItem(req, res) {
     await saveToFile();
     res.status(200).json({ message: "Todo deleted successfully" });
   } catch (error) {
-    logger.error("deleteTodoItem Failure:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    internalServerError(res, "deleteTodoItem", error);
   }
 }
 
 app.post("/auth/signup", requestInfoLogger, registerUser);
 app.post("/auth/signin", requestInfoLogger, loginUser);
 app.get("/users/me", requestInfoLogger, authenticateToken, getUserProfile);
+app.get("/todos/search", requestInfoLogger, authenticateToken, searchTodos);
 app.get("/todos/list", requestInfoLogger, authenticateToken, getTodoList);
 app.post("/todos/new", requestInfoLogger, authenticateToken, addTodoItem);
 app.put("/todos/update", requestInfoLogger, authenticateToken, updateTodoItem);

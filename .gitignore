@@ -1,5 +1,6 @@
 #data
 data/
+.postman
 
 # Logs
 logs
