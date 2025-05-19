@@ -86,7 +86,7 @@ async function registerUser(req, res) {
     }
 
     const userID = generateRandomID(USERID_SIZE);
-    data[userID] = { username, password, todos: {}};
+    data[userID] = { username, password, todos: {} };
     await fs.writeFile(TODOS_FILE, JSON.stringify(data, null, 2));
     res.status(200).json({ message: "user signup successful" });
   } catch (error) {
@@ -237,8 +237,8 @@ async function updateTodoItem(req, res) {
 
     if (req.body.title !== undefined) updates.title = req.body.title;
     if (req.body.desc !== undefined) updates.desc = req.body.desc;
-    if (updates.status !== undefined) {
-      if (!ALLOWED_STATUSES.includes(updates.status)) {
+    if (req.body.status !== undefined) {
+      if (!ALLOWED_STATUSES.includes(req.body.status)) {
         return res.status(400).json({ error: "Invalid status provided!" });
       }
       updates.status = req.body.status;
