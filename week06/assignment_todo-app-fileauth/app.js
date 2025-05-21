@@ -71,7 +71,7 @@ async function saveToFile() {
     const temp_file = `${TODOS_FILE}.tmp`;
     await fs.writeFile(temp_file, JSON.stringify(data, null, 2));
     await fs.rename(temp_file, TODOS_FILE);
-    await loadTodos;
+    await loadTodos();
   } catch (error) {
     logger.error("Failed to save tasks:", error);
   }
@@ -120,7 +120,9 @@ function loginUser(req, res) {
     if (!userEntry) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
-    const [userid, userdata] = userEntry;
+    
+    const userid = userEntry[0];   
+
     const authToken = jwt.sign({ userid }, JWT_SECRET, { expiresIn: "1h" });
 
     res.status(200).json({
