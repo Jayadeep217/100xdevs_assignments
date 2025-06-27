@@ -1,21 +1,25 @@
-const {mongoose, Schema, ObjectId} = require("mongoose");
+const { mongoose, Schema, ObjectId } = require("mongoose");
 
-const User = new Schema({
-  username: String,
-  password: String,
-  email: String,
-});
+const userSchema = new Schema(
+  {
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+  },
+  { timestamps: true }
+);
 
-const Todo = new Schema({
+const todoSchema = new Schema({
   title: String,
-  status: String,
+  description: String,
+  status: Number,
   userid: ObjectId,
 });
 
-const Usermodel = mongoose.model("users", User);
-const Todomodel = mongoose.model("todos", Todo);
+const User = mongoose.model("users", userSchema);
+const Todo = mongoose.model("todos", todoSchema);
 
 module.exports = {
-  Usermodel,
-  Todomodel,
+  User,
+  Todo,
 };
