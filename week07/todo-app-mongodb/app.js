@@ -1,27 +1,31 @@
 const express = require("express");
-const mongoose = require("mongoose");
+const { mongoose, ObjectId } = require("mongoose");
 
 const { User, Todo } = require("./db");
-const { authenticateToken } = require("./auth");
+const { authenticateToken, generateToken } = require("./auth");
 
 const PORT = 4676;
 const MONGODB_IP = "127.0.0.1";
 const MONGODB_PORT = "27017";
 const DB_NAME = "todo-app-mongodb";
 const MONGODB_URI = `mongodb://${MONGODB_IP}:${MONGODB_PORT}/${DB_NAME}`;
+const TODO_STATUS = { done: 0, todo: 1, "in-progress": 2 };
 
 const app = express();
 
 app.use(express.json());
 
-mongoose.connect(MONGODB_URI);
+mongoose
+  .connect(MONGODB_URI)
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch((err) => console.error("❌ MongoDB error:", err));
 
 async function registerUser(req, res) {
   try {
-    const { name, email, password } = req.body;
+    const { email, username, password } = req.body;
     await User.insertOne({
-      name: name,
       email: email,
+      username: username,
       password: password,
     });
     res.json({ message: "SignUp successful" });
@@ -33,12 +37,19 @@ async function registerUser(req, res) {
 
 async function loginUser(req, res) {
   try {
-    const { name, password } = req.body;
-    await User.findOne({
-      name: name,
+    const { username, password } = req.body;
+
+    const user = await User.findOne({
+      username: username,
       password: password,
     });
-    res.json({ message: "Login successful" });
+
+    const authToken = generateToken(user._id.toString());
+
+    res.status(200).json({
+      message: "Login successful!",
+      authToken: authToken,
+    });
   } catch (error) {
     console.error("Login failed!\n", error);
     res.status(403).json({ message: "Login Failed!" });
@@ -47,38 +58,48 @@ async function loginUser(req, res) {
 
 async function getUserProfile(req, res) {
   try {
-    const { name, password } = req.body;
-    await User.findOne({
-      name: name,
-      password: password,
-    });
-    res.json( );
+    const profile = await User.findById(req.userid);
+    res.json(profile);
   } catch (error) {
-    console.error("Login failed!\n", error);
-    res.status(403).json({ message: "Login Failed!" });
+    console.error("getUserProfile failed!\n", error);
+    res.status(403).json({ message: "getUserProfile Failed!" });
   }
 }
 
-async function createTodo() {
+async function createTodo(req, res) {
   try {
-    const { title, status } = req.body;
-    await Todo.insertOne({
+    const { title, description, status } = req.body;
+
+    const todo = await Todo.insertOne({
       title: title,
-      status: status,
-      userid: ObjectId,
+      description: description,
+      status: TODO_STATUS[status],
+      userid: req.userid,
     });
-  } catch (error) {}
+
+    res.status(200).json({
+      message: "Todo added successfully!",
+      todo: todo,
+    });
+  } catch (error) {
+    console.error("Create Todo failed!\n", error);
+    res.status(403).json({ message: "Create Todo Failed!" });
+  }
 }
 
-async function getTodos() {
+async function getTodos(req, res) {
   try {
-    Todo.find({});
-  } catch (error) {}
+    const todos = await Todo.find({ userid: req.userid });
+    res.status(200).json(todos);
+  } catch (error) {
+    console.error("Get all Todos failed!\n", error);
+    res.status(403).json({ message: "Get all Todos Failed!" });
+  }
 }
 
 app.post("/auth/signup", registerUser);
 app.post("/auth/signin", loginUser);
-app.post("/auth/me", authenticateToken, getUserProfile);
+app.get("/users/me", authenticateToken, getUserProfile);
 app.post("/todos/new", authenticateToken, createTodo);
 app.get("/todos/list", authenticateToken, getTodos);
 
