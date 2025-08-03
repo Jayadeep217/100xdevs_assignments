@@ -1,19 +1,19 @@
 {
-  "name": "todo-app-mongodb",
+  "name": "todo-app",
   "version": "1.0.0",
-  "description": "",
+  "description": "Todo Application",
+  "license": "ISC",
+  "author": "jayadeep",
+  "type": "commonjs",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "bcrypt": "^6.0.0",
+    "dayjs": "^1.11.13",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.16.0"
+    "mongoose": "^8.17.0",
+    "winston": "^3.17.0"
   }
 }

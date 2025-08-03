@@ -1,10 +1,11 @@
+const bcrypt = require("bcrypt");
 const express = require("express");
 const { mongoose, ObjectId } = require("mongoose");
 
 const { User, Todo } = require("./db");
 const { authenticateToken, generateToken } = require("./auth");
 
-const PORT = 4676;
+const APP_PORT = 4676;
 const MONGODB_IP = "127.0.0.1";
 const MONGODB_PORT = "27017";
 const DB_NAME = "todo-app-mongodb";
@@ -23,10 +24,13 @@ mongoose
 async function registerUser(req, res) {
   try {
     const { email, username, password } = req.body;
+
+    const encryptedPassword = await bcrypt.hash(password, 5);
+
     await User.insertOne({
       email: email,
       username: username,
-      password: password,
+      password: encryptedPassword,
     });
     res.json({ message: "SignUp successful" });
   } catch (error) {
@@ -41,18 +45,24 @@ async function loginUser(req, res) {
 
     const user = await User.findOne({
       username: username,
-      password: password,
     });
 
-    const authToken = generateToken(user._id.toString());
+    const isValidPassword = await bcrypt.compare(password, user.password);
 
-    res.status(200).json({
-      message: "Login successful!",
-      authToken: authToken,
-    });
+    if (isValidPassword) {
+      const authToken = generateToken(user._id.toString());
+
+      res.status(200).json({
+        message: "Login successful!",
+        authToken: authToken,
+      });
+    }
+    else{
+      throw Error("Wrong Password!");
+    }
   } catch (error) {
     console.error("Login failed!\n", error);
-    res.status(403).json({ message: "Login Failed!" });
+    res.status(403).json({ message: "Login Failed:" + error });
   }
 }
 
@@ -103,10 +113,10 @@ app.get("/users/me", authenticateToken, getUserProfile);
 app.post("/todos/new", authenticateToken, createTodo);
 app.get("/todos/list", authenticateToken, getTodos);
 
-app.listen(PORT, function (error) {
+app.listen(APP_PORT, function (error) {
   if (error) {
     console.error("startup failed!", error);
   } else {
-    console.info(`App started on port ${PORT}`);
+    console.info(`App started on port ${APP_PORT}`);
   }
 });
