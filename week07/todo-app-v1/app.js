@@ -1,4 +1,5 @@
 const express = require("express");
+const { initLogger } = require("./logger");
 
 const app = express();
 
@@ -26,3 +27,6 @@ app.post("/todos", addTodoItem);
 app.get("/todos/:todoId", getTodoById);
 app.put("/todos/:todoId", updateTodoItem);
 app.delete("/todos/:todoId", deleteTodoItem);
+
+const logger = await initLogger();
+await closeLogger(logger);
