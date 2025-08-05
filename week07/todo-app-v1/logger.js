@@ -11,7 +11,8 @@ dayjs.extend(timezone);
 
 const LOGS_DIR = path.join(__dirname, "logs");
 const LOGS_FILE = path.join(LOGS_DIR, "app.log");
-const LOG_LEVEL = process.env.LOG_LEVEL || "info";
+const ERROR_LOGS_FILE = path.join(LOGS_DIR, "error.log");
+const LOG_LEVEL = "info";
 const MAX_LOG_SIZE = 50 * 1024 * 1024;
 const MAX_LOG_FILES = 20;
 
@@ -38,9 +39,7 @@ const logFormat = format.printf(
 async function initLogStorage() {
   try {
     await fs.mkdir(LOGS_DIR, { recursive: true });
-    console.log(
-      `${getISTFormattedDateTime()} - Log directory initialized: ${LOGS_DIR}`
-    );
+    console.log(`${getISTFormattedDateTime()} - Logs directory initialized`);
   } catch (error) {
     const errorMessage = `${getISTFormattedDateTime()} - Failed to initialize log storage! Exiting application.`;
     console.error(errorMessage, error);
@@ -61,10 +60,8 @@ async function initLogger() {
         logFormat
       ),
       transports: [
-        // Console transport with colorized output for development
         new transports.Console({
           format: format.combine(
-            format.colorize(),
             format.timestamp({ format: getISTFormattedDateTime }),
             logFormat
           ),
@@ -72,7 +69,6 @@ async function initLogger() {
           handleRejections: true,
         }),
 
-        // File transport for persistent logging
         new transports.File({
           filename: LOGS_FILE,
           level: LOG_LEVEL,
@@ -87,9 +83,8 @@ async function initLogger() {
           ),
         }),
 
-        // Separate error log file for errors and above
         new transports.File({
-          filename: path.join(LOGS_DIR, "error.log"),
+          filename: ERROR_LOGS_FILE,
           level: "error",
           maxsize: MAX_LOG_SIZE,
           maxFiles: MAX_LOG_FILES,
@@ -105,12 +100,7 @@ async function initLogger() {
       exitOnError: false,
     });
 
-    // Add request ID support for better tracing
-    logger.addRequestId = (requestId) => {
-      return logger.child({ requestId });
-    };
-
-    logger.info("Logger initialized successfully", {
+    logger.info("Logger info", {
       logLevel: LOG_LEVEL,
       logDir: LOGS_DIR,
       maxSize: MAX_LOG_SIZE,
@@ -129,8 +119,12 @@ async function initLogger() {
 
 async function closeLogger(logger) {
   return new Promise((resolve) => {
-    logger.on("finish", resolve);
-    logger.end();
+    if (logger) {
+      logger.on("finish", resolve);
+      logger.end();
+    } else {
+      resolve();
+    }
   });
 }
 
